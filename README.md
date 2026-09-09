@@ -4,7 +4,7 @@ Firmware, který z vývojové desky **LaskaKit ESPink-4.26** udělá čtečku
 elektronických knih. Knihy nahrajete přes WiFi z prohlížeče nebo přímo na
 microSD kartu, EPUB si čtečka převede sama a čte se třemi tlačítky na desce.
 
-Navrhl [chiptron.cz](https://chiptron.cz).
+Navrhl [chiptron.cz](https://chiptron.cz) a Claude AI.
 
 ## Co potřebujete
 
