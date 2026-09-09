@@ -47,7 +47,7 @@ Na kartě vytvořte složku `books`. Do ní patří knihy. Kartu pak zasuňte do
 
 ## Jak dostat knihy do čtečky
 
-M�te dvě možnosti a obě končí stejně, tedy souborem na kartě.
+M�te dvě možnosti a obě končí stejně, tedy souborem na kartě.
 
 **Přes kartu.** Vyndejte kartu, zasuňte ji do počítače a nakopírujte knihy do
 složky `books`. Funguje `.epub` i `.book`.
