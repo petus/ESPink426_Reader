@@ -2,6 +2,39 @@
 
 Verzování podle [semver](https://semver.org/lang/cs/).
 
+## [0.1.2]
+
+### Čtení
+
+- Dlouhé odstavce se zobrazí celé i u velkého písma.
+- Měkké dělení slov se nezobrazuje jako spojovník uprostřed slova.
+- Na konci knihy vrátí UP na poslední stránku.
+
+### Knihovna
+
+- Naposledy čtená kniha je v záložce Rozečteno vždy nahoře.
+- Dlouhé české názvy se v seznamu zkracují po celých znacích.
+- Pozice čtení přežije výpadek napájení i v okamžiku ukládání.
+
+### Ovládání
+
+- Stisky dvou různých tlačítek během překreslování se zpracují oba.
+- Z chybové hlášky vrátí libovolné tlačítko do seznamu knih.
+
+### Konverze EPUB
+
+- Knihy až s 512 soubory v archivu. Obrázky, fonty a styly se přeskakují.
+- Kapitoly se poznají podle typu v `content.opf`, nejen podle přípony.
+- Cesty s `../` v `content.opf`.
+- `content.opf` až do 96 kB.
+- Samostatný znak `&` v textu se zachová.
+- Entity v názvu a autorovi knihy.
+- Stabilnější převod velkých knih, dekompresor je na heapu.
+
+### WiFi
+
+- Znovu nahraný EPUB nahradí starší převod, kniha se převede znovu.
+
 ## [0.1.1]
 
 ### Čtení

@@ -2,18 +2,17 @@
 
 Firmware, který z vývojové desky **LaskaKit ESPink-4.26** udělá čtečku
 elektronických knih. Knihy nahrajete přes WiFi z prohlížeče nebo přímo na
-microSD kartu, EPUB si čtečka převede sama a knihy vybíráte nebo listujete v knize třemi tlačítky na desce.
+microSD kartu, EPUB si čtečka převede sama a čte se třemi tlačítky na desce.
 
-Navrhl [chiptron.cz](https://chiptron.cz) a Claude AI.
+Navrhl [chiptron.cz](https://chiptron.cz).
 
 ## Co potřebujete
 
 - **[LaskaKit ESPink-4.26 ESP32-S3 e-Paper](https://www.laskakit.cz/laskakit-espink-4-26-esp32-s3-e-paper/)**
-  s displejem 4,26" 800 × 480, verze 1.4
-- **microSD kartu** naformátovanou na FAT32
+  s displejem 4,26" 800 × 480
+- **microSD kartu** do 32 GB, naformátovanou na FAT32
 - **LiPol baterii** s konektorem JST-PH
 - USB-C kabel
-- nebo **[tuhle stavebnici, kde je všechno](https://www.laskakit.cz/laskakit-live-4-26-e-paper-stavebnice-s-wifi-pro---zivy-obraz-/)**
 
 Karty nad 32 GB se z výroby dodávají jako exFAT a čtečka je nepřečte.
 Přeformátujte je na FAT32.
@@ -26,10 +25,10 @@ Nemusíte nic programovat. Stačí nahrát hotový soubor a vložit kartu.
 
 ## Nahrání firmwaru
 
-Použijte webový nástroj **[esp32flasher.chiptron.cz](https://esp32flasher.chiptron.cz)**.
+Použijte náš webový nástroj **[esp32flasher.chiptron.cz](https://esp32flasher.chiptron.cz)**.
 Běží přímo v prohlížeči, nic se neinstaluje.
 
-1. Stáhněte si soubor `ESPink426_Reader_vX.bin` z tohoto repozitáře, složka Releases.
+1. Stáhněte si soubor `ESPink426_Reader.bin` z tohoto repozitáře.
 2. Otevřete [esp32flasher.chiptron.cz](https://esp32flasher.chiptron.cz)
    v prohlížeči **Chrome nebo Edge**. Firefox a Safari to neumí.
 3. Připojte desku k počítači USB-C kabelem.
@@ -48,15 +47,15 @@ Na kartě vytvořte složku `books`. Do ní patří knihy. Kartu pak zasuňte do
 
 ## Jak dostat knihy do čtečky
 
-Máte dvě možnosti a obě končí stejně úspěšně, tedy souborem na kartě.
+Máte dvě možnosti a obě končí stejně, tedy souborem na kartě.
 
 **Přes kartu.** Vyndejte kartu, zasuňte ji do počítače a nakopírujte knihy do
-složky `books`. Funguje `.epub` i `.book` (o typu souboru *.book níže - část "Formáty knih")
+složky `books`. Funguje `.epub` i `.book`.
 
-**Přes WiFi.** Podržte tlačítko PUSH pět sekund při zapnutí/resetu čtečky. Na
-displeji se objeví, kam se připojit. Otevřete v prohlížeči uvedenou IP adresu a
+**Přes WiFi.** Podržte tlačítko PUSH pět sekund při zapnutí čtečky. Na
+displeji se objeví, kam se připojit. Otevřete v prohlížeči uvedenou adresu a
 knihy nahrajete přetažením do stránky. Čtečka je uloží na kartu, takže
-výsledek je stejný, jako byste kartu vyndali. Detailně níže - část "Nahrávání knih přes WiFi podrobně".
+výsledek je stejný, jako byste kartu vyndali.
 
 ## Ovládání
 
@@ -66,10 +65,10 @@ Deska má tři tlačítka. Ovládání má tři úrovně.
 Nepřečteno a Přečteno. Krátký stisk PUSH vstoupí do seznamu.
 
 **Seznam knih** se prochází tlačítky UP a DOWN, držením se posouvá rychleji.
-Krátký stisk PUSH otevře knihu, dlouhý stisk vrátí na záložky (min 2s).
+Krátký stisk PUSH otevře knihu, dlouhý stisk vrátí na záložky.
 
 **Čtení** se listuje tlačítky UP a DOWN. Krátký stisk PUSH mění velikost
-písma, dlouhý stisk (min 2s) vrátí do seznamu.
+písma, dlouhý stisk vrátí do seznamu.
 
 Dlouhý stisk znamená podržení na dvě sekundy.
 
@@ -83,14 +82,13 @@ stránce, takže po vypnutí pokračujete tam, kde jste skončili.
 
 **EPUB nahrajete taky.** Při prvním otevření si ho čtečka převede sama, což
 trvá 5 až 10 sekund podle velikosti. Na kartě pak leží oba soubory, v seznamu
-se ale zobrazí jen výsledek, tedy *.book se stejným názvem jako vložený ePub.
+se ale zobrazí jen výsledek.
 
 ## Nahrávání knih přes WiFi podrobně
 
-Podržte PUSH pět sekund při zapnutí. Na displeji se objeví, kam se připojit. 
-Deska vytvoří vlastní WiFi, na ní se připojíte a můžete tam zadat SSID a heslo vaší domácí WiFi sítě.
+Podržte PUSH pět sekund při zapnutí. Na displeji se objeví, kam se připojit.
 
-Když máte uloženou domácí síť, čtečka se připojí k ní a ukáže IP adresu nebo zadáte do prohlížeče "ctecka.local" (tuhle vlastnost nepodporují všechny routery). 
+Když máte uloženou domácí síť, čtečka se připojí k ní a ukáže IP adresu.
 Jinak vytvoří vlastní hotspot a ukáže název sítě i heslo. Na telefonu se
 stránka většinou otevře sama.
 
@@ -98,21 +96,23 @@ Na stránce nahrajete knihy přetažením nebo výběrem, smažete je, označít
 přečtené a nastavíte velikost písma i dobu do uspání. Domácí síť si můžete
 vybrat ze seznamu dostupných, nemusíte psát název ručně.
 
-Režim se sám vypne po pěti minutách nečinnosti. Dlouhé nahrávání ho nepřeruší. WiFi funguje pouze v případě, kdy při zapnutí/resetu čtečky držíte tlačítko PUSH alespoň 5s. Jinak je WiFi vypnutá z důvodu úspory energie.
+Režim se sám vypne po pěti minutách nečinnosti. Dlouhé nahrávání ho nepřeruší.
 
 ## Úspora energie
 
 Při čekání na stisk je deska v light sleepu. Po nastavené době nečinnosti,
 ve výchozím stavu po pěti minutách, přejde do deep sleepu. Z něj ji probudí
-tlačítko RESET nebo vypnutí a zapnutí napájení čtečky.
+tlačítko RESET nebo vypnutí a zapnutí napájení.
 
-Tlačítka UP, PUSH a DOWN jsou na pinech, které v režimu hlubokého spánku nefungují - fungují jen během aktivního čtení. Je to omezení desky, ne firmwaru.
+Tlačítka UP, PUSH a DOWN jsou na pinech, které nejsou v RTC doméně, takže
+z deep sleepu čtečku probudit nemohou. Je to omezení desky, ne firmwaru.
 
 WiFi i Bluetooth jsou při čtení vypnuté. WiFi se zapne jen v režimu
 nahrávání knih.
 
 Čtečka hlídá napětí baterie. Pod 3,5 V se uspí a uloží pozici, aby se
-článek nepodvybil. Režim nahrávání se nespustí pod 3,6 V.
+článek nepodvybil. Režim nahrávání se nespustí pod 3,6 V, protože WiFi má
+proudové špičky přes 300 mA.
 
 Deska má vypínač. Můžete ji vypnout kdykoli, zápisy na kartu jsou dělané tak,
 aby to nevadilo.
@@ -139,7 +139,10 @@ Nastavení desky:
 | USB CDC On Boot | **Disabled** |
 | PSRAM | není potřeba |
 
-Pokud vám IDE hlásí, že je sketch příliš velký, máte špatně Partition Scheme.
+Poslední položka je důležitá. Deska nemá nativní USB, sériová linka jde přes
+převodník. Při zapnutém CDC zůstane sériový monitor němý.
+
+Pokud vám IDE hlásí, že je skeč příliš velký, máte špatně Partition Scheme.
 Výchozí schéma dává aplikaci jen 1,2 MB, což nestačí.
 
 Když IDE hlásí, že našlo víc knihoven `SD.h`, smažte samostatnou knihovnu SD
@@ -194,6 +197,12 @@ Vše podstatné je v `config.h`:
 Fonty musí být varianty `_te`. Varianty `_tf` pokrývají jen Latin-1 a české
 háčky a kroužky by v nich chyběly.
 
+Ani `_te` ale nestačí na všechno. Obsahují glyfy s unicode 32 až 701, takže
+typografická interpunkce jako uvozovky, pomlčka nebo výpustka v nich není.
+Tyto znaky se proto při konverzi i při čtení nahrazují za ASCII ekvivalenty,
+tabulka je v `textmap.h`. Neznámý znak mimo rozsah se nahradí otazníkem, aby
+bylo vidět, že něco chybí.
+
 ## Formát .book
 
 Textový soubor v UTF-8. Každý řádek je jeden odstavec. Prefixy určují typ:
@@ -211,7 +220,6 @@ odstavce nemají mít vlastní zalomení.
 
 ## Odkazy
 
-- Vývoj: [chiptron.cz](https://chiptron.cz)
 - Deska: [LaskaKit ESPink-4.26](https://www.laskakit.cz/laskakit-espink-4-26-esp32-s3-e-paper/)
 - microSD karty a LiPol baterie: [laskakit.cz](https://www.laskakit.cz)
 - Nahrání firmwaru: [esp32flasher.chiptron.cz](https://esp32flasher.chiptron.cz)
