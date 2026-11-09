@@ -125,15 +125,20 @@ inline void btnClearLatchFor(int pin) {
   noInterrupts(); g_btnLatch &= ~bit; interrupts();
 }
 
-// Vyzvedne a vynuluje zamek. Vraci pin, nebo 0.
+// Vyzvedne JEDEN stisk ze zamku a vynuluje jen jeho bit. Vraci pin, nebo 0.
+// Drive se mazal cely zamek, takze kdyz behem kresleni prisly stisky dvou
+// ruznych tlacitek, druhy se ztratil.
 inline int btnTakeLatch() {
   noInterrupts();
   uint8_t l = g_btnLatch;
-  g_btnLatch = 0;
+  uint8_t bit = (l & RDR_LATCH_PUSH) ? RDR_LATCH_PUSH :    // PUSH ma prednost
+                (l & RDR_LATCH_DOWN) ? RDR_LATCH_DOWN :
+                (l & RDR_LATCH_UP)   ? RDR_LATCH_UP : 0;
+  g_btnLatch &= ~bit;
   interrupts();
-  if (l & RDR_LATCH_PUSH) return RDR_BTN_PUSH;   // PUSH ma prednost
-  if (l & RDR_LATCH_DOWN) return RDR_BTN_DOWN;
-  if (l & RDR_LATCH_UP)   return RDR_BTN_UP;
+  if (bit == RDR_LATCH_PUSH) return RDR_BTN_PUSH;
+  if (bit == RDR_LATCH_DOWN) return RDR_BTN_DOWN;
+  if (bit == RDR_LATCH_UP)   return RDR_BTN_UP;
   return 0;
 }
 
@@ -313,8 +318,6 @@ inline void btnWaitRelease() {
 }
 
 // Drzi uzivatel tlacitko dal? Pouziva se pro autorepeat v seznamu.
-// Po uvolneni se vycisti zamek - behem opakovani mohly prijit dalsi hrany
-// (zakmit pri rozepnuti) a ty uz nejsou samostatnym stiskem.
 inline bool btnRepeat(int pin) {
   if (!btnPressed(pin)) return false;
   delay(RDR_REPEAT_RATE_MS);

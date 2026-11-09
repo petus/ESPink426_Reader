@@ -204,7 +204,7 @@ public:
       centerText(book.title(), RDR_SCREEN_H / 2 - 2);
       _u.setFont(RDR_FONT_ROW_SUB);
       centerText("Označeno jako přečtené.", RDR_SCREEN_H / 2 + 34);
-      centerText("Dlouhým stiskem PUSH zpět do seznamu.", RDR_SCREEN_H / 2 + 58);
+      centerText("PUSH: zpět do seznamu   UP: poslední stránka", RDR_SCREEN_H / 2 + 58);
       drawStatus(dev, battPct, "100 %");
     } while (_d.nextPage());
     _refreshes++;
@@ -382,9 +382,16 @@ private:
     // nazev, zkraceny aby se vesel
     _u.setFont(RDR_FONT_ROW);
     String t = b.title;
-    while (_u.getUTF8Width(t.c_str()) > RDR_SCREEN_W - 130 && t.length() > 4)
-      t = t.substring(0, t.length() - 2);
-    if (t != b.title) t += "…";
+    bool cut = false;
+    while (_u.getUTF8Width(t.c_str()) > RDR_SCREEN_W - 150 && t.length() > 4) {
+      // Ubirat po celych UTF-8 znacich. Drive se ubiraly 2 bajty, coz
+      // u ceskych nazvu rozpulilo znak s diakritikou a vzniklo smeti.
+      int k = t.length() - 1;
+      while (k > 0 && (((uint8_t)t[k]) & 0xC0) == 0x80) k--;
+      t.remove(k);
+      cut = true;
+    }
+    if (cut) { t.trim(); t += "..."; }
     _u.setCursor(RDR_MARGIN_X, y + 22);
     _u.print(t);
 
@@ -430,6 +437,7 @@ private:
   String statusRight(RdrLibrary &lib, RdrCategory cat, int cursor) {
     int n = lib.countIn(cat);
     if (n == 0) return "";
+    if (cursor < 0) return "Knih: " + String(n);      // vyber zalozky, bez kurzoru
     return String(cursor + 1) + "/" + String(n);
   }
 

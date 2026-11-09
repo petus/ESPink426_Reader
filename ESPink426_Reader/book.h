@@ -27,6 +27,7 @@
 #include <vector>
 #include <U8g2_for_Adafruit_GFX.h>
 #include "config.h"
+#include "textmap.h"
 
 // Pozice v knize: zacatek odstavce + kolik jeho radku uz je za nami.
 struct RdrPos {
@@ -101,7 +102,11 @@ public:
     _f.seek(_pos.para);
     uint16_t skip = _pos.line;
 
-    static String wrapped[RDR_MAX_LINES];
+    // Kapacita pro zalomene radky JEDNOHO odstavce. Musi pojmout radky,
+    // ktere uz jsou za nami (skip), plus jednu celou stranku. Drive tu bylo
+    // pevnych RDR_MAX_LINES (44) radku na cely odstavec a delsi odstavce
+    // (u velkeho pisma uz kolem 1500 znaku) se na konci tise USEKLY.
+    static std::vector<String> wrapped;
 
     while (_nLines < RDR_MAX_LINES) {
       uint32_t paraStart = _f.position();
@@ -129,7 +134,13 @@ public:
       int gapTop = (style == 2) ? (lineH / 2) : (style == 1) ? (lineH / 3) : 0;
 
       setFont(u8, style);
-      int n = wrap(u8, text, right - left, wrapped, RDR_MAX_LINES);
+      // Zalamujeme jen tolik radku, kolik muze byt potreba: preskocene plus
+      // jedna stranka. Zbytek odstavce prijde na radu na dalsi strance.
+      int cap = (int)skip + RDR_MAX_LINES;
+      if ((int)wrapped.size() < cap) wrapped.resize(cap);
+      bool truncated = false;
+      int n = wrap(u8, text, right - left, wrapped.data(), cap, truncated);
+      if ((int)skip >= n) skip = 0;   // pojistka: pozice z jine sazby
 
       for (int i = (int)skip; i < n; i++) {
         int yy = y + ((i == (int)skip) ? gapTop : 0);
@@ -145,7 +156,12 @@ public:
         _nLines++;
         y += lineH;
         if (_nLines >= RDR_MAX_LINES) {
-          _next.para = paraStart; _next.line = (uint16_t)(i + 1);
+          if (i + 1 >= n && !truncated) {
+            // posledni radek odstavce -> dalsi stranka zacne dalsim odstavcem
+            _next.para = (uint32_t)_f.position(); _next.line = 0;
+          } else {
+            _next.para = paraStart; _next.line = (uint16_t)(i + 1);
+          }
           return;
         }
       }
@@ -276,6 +292,11 @@ private:
     } else {
       type = ' '; text = ln;
     }
+
+    // Nahradit znaky, ktere font nezna. Deje se to i tady, nejen pri
+    // konverzi, aby se spravne zobrazily i soubory prevedene starsi verzi
+    // nebo skriptem na pocitaci.
+    rdrSanitizeForDisplay(text);
     return true;
   }
 
@@ -285,8 +306,8 @@ private:
       uint32_t p = _f.position();
       String ln = _f.readStringUntil('\n');
       if (ln.endsWith("\r")) ln.remove(ln.length() - 1);
-      if (ln.startsWith("T:")) { _title  = ln.substring(2); continue; }
-      if (ln.startsWith("A:")) { _author = ln.substring(2); continue; }
+      if (ln.startsWith("T:")) { _title  = ln.substring(2); rdrSanitizeForDisplay(_title);  continue; }
+      if (ln.startsWith("A:")) { _author = ln.substring(2); rdrSanitizeForDisplay(_author); continue; }
       _f.seek(p); _bodyStart = p; return;
     }
     _bodyStart = (uint32_t)_f.position();
@@ -303,9 +324,11 @@ private:
   }
 
   // Rozlamani odstavce na radky podle sirky sloupce. Vraci pocet radku.
+  // truncated = true, kdyz se do maxLines nevesel cely odstavec.
   static int wrap(U8G2_FOR_ADAFRUIT_GFX &u8, const String &text,
-                  int maxW, String *out, int maxLines) {
+                  int maxW, String *out, int maxLines, bool &truncated) {
     int n = 0, i = 0, len = text.length();
+    truncated = false;
     String cur = "";
 
     while (i < len && n < maxLines) {
@@ -318,7 +341,10 @@ private:
       // Bez tohoto osetreni by preteklo pres pravy okraj, protoze
       // podminka nize vyzaduje neprazdne cur.
       if (u8.getUTF8Width(w.c_str()) > maxW) {
-        if (cur.length()) { out[n++] = cur; cur = ""; if (n >= maxLines) break; }
+        if (cur.length()) {
+          out[n++] = cur; cur = "";
+          if (n >= maxLines) { truncated = true; break; }   // slovo w zbyva
+        }
         String piece = "";
         int k = 0;
         while (k < (int)w.length() && n < maxLines) {
@@ -332,6 +358,7 @@ private:
           piece = tryPiece;
           k += cl;
         }
+        if (k < (int)w.length()) truncated = true;          // zbytek slova se nevesel
         cur = piece;
         continue;
       }
@@ -344,7 +371,11 @@ private:
         cur = trial;
       }
     }
-    if (cur.length() && n < maxLines) out[n++] = cur;
+    if (cur.length()) {
+      if (n < maxLines) out[n++] = cur;
+      else truncated = true;
+    }
+    if (i < len) truncated = true;
     return n;
   }
 };

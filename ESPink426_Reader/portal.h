@@ -288,6 +288,18 @@ static void hUploadData() {
                  String(g_upExpect) + " B). Soubor byl odstraněn, zkuste to znovu.";
       RDR_LOG("portal: NEUPLNY PRENOS, soubor smazan");
     }
+    // Nove nahrany EPUB: kdyz uz na karte lezi .book ze stejnojmenneho
+    // drivejsiho EPUBu, smazat ho. Jinak by se novy EPUB v seznamu skryl
+    // (viz hideConvertedEpubs) a ctecka by dal ukazovala starou verzi.
+    if (!g_upFail && rdrExtOf(g_upName) == ".epub") {
+      String stale = String(RDR_BOOKS_DIR) + "/" +
+                     g_upName.substring(0, g_upName.length() - 5) + ".book";
+      if (SD.exists(stale)) {
+        SD.remove(stale);
+        SD.remove(stale + RDR_POS_SUFFIX);
+        RDR_LOG("portal: stary prevod '%s' smazan, EPUB se prevede znovu", stale.c_str());
+      }
+    }
     g_upExpect = 0;   // plati vzdy jen pro nejblizsi nahravani
   }
   else if (up.status == UPLOAD_FILE_ABORTED) {

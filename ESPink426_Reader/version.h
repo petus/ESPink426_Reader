@@ -15,7 +15,7 @@
 
 
 #define RDR_FW_NAME        "ESPink426Reader"
-#define RDR_FW_VERSION     "0.1.1"
+#define RDR_FW_VERSION     "0.1.2"
 
 // __DATE__ ma tvar "Sep  7 2026" (u jednocifernehio dne dve mezery).
 // Prevedeme na ISO 2026-09-07, at se to dobre radi a vsude vypada stejne.

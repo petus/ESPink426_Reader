@@ -22,6 +22,7 @@
 #include <Arduino.h>
 #include <SD.h>
 #include "log.h"
+#include "textmap.h"
 
 class RdrHtmlText {
 public:
@@ -44,22 +45,34 @@ public:
       switch (_state) {
 
         case TEXT:
-          if (c == '<') { _state = TAG; _tag = ""; }
-          else if (c == '&') { _state = ENTITY; _ent = ""; }
-          else if (!_skipDepth) appendChar(c);
+          textChar(c);
           break;
 
         case TAG:
           if (c == '>') { handleTag(_tag); _state = TEXT; }
-          else if (_tag.length() < 64) _tag += c;
+          else {
+            if (_tag.length() < 64) _tag += c;
+            // Posledni znak pred '>' sledujeme zvlast - jmeno znacky se
+            // uklada jen do 64 znaku, takze "/" u dlouhe znacky by se ztratilo.
+            _tagSlash = (c == '/');
+          }
           break;
 
-        case ENTITY:
+        case ENTITY: {
+          bool entChar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                         (c >= '0' && c <= '9') || c == '#';
           if (c == ';') { if (!_skipDepth) appendEntity(_ent); _state = TEXT; }
-          else if (c == '<') { _state = TAG; _tag = ""; }        // nedokoncena entita
-          else if (_ent.length() < 12) _ent += c;
-          else { _state = TEXT; }                                 // nesmysl, zahodit
+          else if (entChar && _ent.length() < 12) _ent += c;
+          else {
+            // Nebyla to entita, ale obycejny ampersand ("Tom & Jerry").
+            // Drive se nasledujicich az 12 znaku zahodilo. Vratime je do
+            // textu a aktualni znak zpracujeme normalne.
+            _state = TEXT;
+            if (!_skipDepth) { appendChar('&'); for (size_t k = 0; k < _ent.length(); k++) appendChar(_ent[k]); }
+            textChar(c);
+          }
           break;
+        }
       }
     }
     return _ok;
@@ -67,6 +80,14 @@ public:
 
   // Dopsat posledni rozpracovany odstavec
   bool finish() { flushPara(); return _ok; }
+
+private:
+  void textChar(char c) {
+    if (c == '<') { _state = TAG; _tag = ""; _tagSlash = false; }
+    else if (c == '&') { _state = ENTITY; _ent = ""; }
+    else if (!_skipDepth) appendChar(c);
+  }
+public:
 
 private:
   enum St : uint8_t { TEXT, TAG, ENTITY };
@@ -79,6 +100,7 @@ private:
   bool    _chapterPending = false;
   bool    _lastWasSpace = true;
   bool    _ok = true;
+  bool    _tagSlash = false;   // znacka konci "/>" (samouzaviraci)
 
   void appendChar(char c) {
     // Bile znaky se sloucí do jedne mezery - odstavec je jeden radek.
@@ -105,6 +127,11 @@ private:
     if (t.length() == 0) return;
 
     normalizeCzech(t);
+
+    // Typografickou interpunkci (uvozovky, pomlcky, vypustku) font _te
+    // neobsahuje - lezi nad kodovym bodem 701. Bez teto nahrady by se
+    // na displeji nevykreslila vubec a v textu by chybely uvozovky.
+    rdrSanitizeForDisplay(t);
 
     String line;
     if (_headingLevel > 0) {
@@ -136,7 +163,7 @@ private:
     // bloky, jejichz obsah nechceme vubec
     if (name == "script" || name == "style" || name == "head" || name == "svg") {
       if (closing) { if (_skipDepth) _skipDepth--; }
-      else if (raw.indexOf("/>") < 0) _skipDepth++;
+      else if (!_tagSlash) _skipDepth++;   // <script ... /> nema obsah ani konec
       return;
     }
     if (_skipDepth) return;

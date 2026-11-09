@@ -9,9 +9,8 @@
 //   tinfl_* / tdefl_*; archivni a ZIP API tam NENI. Strukturu archivu si
 //   proto ctem sami a miniz pouzivame jen na samotny deflate.
 //
-//   POZOR NA PAMET: tinfl potrebuje 32 kB LZ slovnik. Ten MUSI byt na halde.
-//   Hlavni uloha ma jen 4 kB zasobniku a alokace takoveho pole lokalne
-//   zpusobi tezko dohledatelne pady.
+//   POZOR NA PAMET: tinfl potrebuje 32 kB LZ slovnik. Ten MUSI byt na halde
+//   (viz inflate.h), lokalni pole teto velikosti by preteklo zasobnik.
 //
 //  STRUKTURA ZIP (to podstatne)
 //   Na konci souboru je "End of Central Directory" (EOCD, 0x06054b50),
@@ -45,7 +44,21 @@
   #define RDR_HAVE_MINIZ 0
 #endif
 
-#define RDR_ZIP_MAX_ENTRIES 64      // staci na obsah bezneho EPUBu
+// Kolik polozek archivu si pamatujeme. Drive 64 - jenze EPUB rozdeleny
+// na kratke kapitoly s obrazky ma bezne 100 az 300 souboru a kapitoly
+// za limitem se pri konverzi TISE VYNECHALY. Obrazky, fonty a styly si
+// navic vubec neukladame (viz rdrZipSkip), takze limit plati jen pro text.
+#define RDR_ZIP_MAX_ENTRIES 512
+
+// Polozky, ktere pro prevod na text nepotrebujeme. Usetri pamet i limit.
+static inline bool rdrZipSkip(const String &name) {
+  String n = name; n.toLowerCase();
+  static const char *RDR_SKIP_EXT[] = {
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg",
+    ".ttf", ".otf", ".woff", ".woff2", ".css", ".mp3", ".mp4", ".js" };
+  for (const char *e : RDR_SKIP_EXT) if (n.endsWith(e)) return true;
+  return false;
+}
 
 struct RdrZipEntry {
   String   name;
@@ -188,8 +201,8 @@ private:
       // extra a komentar preskocit
       _f.seek(_f.position() + extraLen + cmtLen);
 
-      // slozky (jmeno konci lomitkem) nas nezajimaji
-      if (!name.endsWith("/")) {
+      // slozky (jmeno konci lomitkem) a obrazky/fonty nas nezajimaji
+      if (!name.endsWith("/") && !rdrZipSkip(name)) {
         RdrZipEntry &e = _entries[_count];
         e.name = name; e.method = method;
         e.compSize = compSz; e.uncompSize = uncompSz; e.localHdr = localHdr;

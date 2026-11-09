@@ -1,5 +1,5 @@
 // ============================================================================
-//  ESPink426_Reader.ino   v0.1.1
+//  ESPink426_Reader.ino   v0.1.2
 //  Ctecka eknih pro LaskaKit ESPink-4.26 (ESP32-S3, GDEQ0426T82 480x800 BW)
 // ----------------------------------------------------------------------------
 //  OVLADANI
@@ -114,7 +114,7 @@ void convProgress(int done, int total, void *) {
   last = millis();
 
   int pct = (total > 0) ? (done * 100 / total) : 0;
-  ui.drawBusy("Zpracovávám… " + String(pct) + " %");
+  ui.drawBusy("Zpracovávám... " + String(pct) + " %");
 }
 
 void drawPortalScreen(const RdrPortalState &st) {
@@ -289,6 +289,7 @@ bool openSelectedBook() {
     if (!conv) {
       ui.drawMessage("Nedostatek paměti", "Zkuste čtečku restartovat.", "",
                      RDR_DEV_ACTIVE, batteryPercent(batteryVoltage()));
+      g_screen = SC_ERROR;
       return true;
     }
     RDR_LOG("volna halda pred konverzi: %u B", (unsigned)ESP.getFreeHeap());
@@ -303,6 +304,7 @@ bool openSelectedBook() {
       ui.drawMessage("Zpracování selhalo", convErr,
                      "Zkuste knihu převést skriptem epub2book.py.",
                      RDR_DEV_ACTIVE, batteryPercent(batteryVoltage()));
+      g_screen = SC_ERROR;
       return true;
     }
 
@@ -317,6 +319,7 @@ bool openSelectedBook() {
                    "Tato kniha je ve formátu EPUB.",
                    "Převeďte ji skriptem epub2book.py na .book.",
                    RDR_DEV_ACTIVE, batteryPercent(batteryVoltage()));
+    g_screen = SC_ERROR;
     return true;
 #endif
   }
@@ -376,7 +379,8 @@ void setup() {
   // Prvni parametr je rychlost ladiciho vypisu GxEPD2. Nula ho vypne -
   // jinak se do seriove linky sype "_Update_Full : ...". Pri diagnostice
   // ho necháme zapnuty, protoze ukazuje, jak dlouho refresh trval.
-  #ifdef RDR_DEBUG_SERIAL
+  // POZOR: #if, ne #ifdef - RDR_DEBUG_SERIAL je definovane vzdy (0 nebo 1).
+  #if RDR_DEBUG_SERIAL
     display.init(115200, true, 2, false);
   #else
     display.init(0, true, 2, false);
@@ -519,9 +523,14 @@ void loop() {
       }
       else if (ev.pin == RDR_BTN_PUSH) {
         if (ev.longPress) showTabs(true);
-        else if (!openSelectedBook())
-          ui.drawMessage("Chyba", "Knihu se nepodařilo otevřít.", "",
+        else if (!openSelectedBook()) {
+          ui.drawMessage("Chyba", "Knihu se nepodařilo otevřít.",
+                         "Stiskněte libovolné tlačítko.",
                          RDR_DEV_ACTIVE, batteryPercent(vb));
+          // Na displeji je hlaska, ne seznam. Ve stavu SC_LIST by dalsi
+          // UP/DOWN prekreslil castecnym refreshem jen dva radky pres ni.
+          g_screen = SC_ERROR;
+        }
       }
       break;
     }
@@ -545,7 +554,7 @@ void loop() {
         // Bez historie se stranka dopocitava prochazenim od zacatku knihy.
         // U vzdalene stranky to trva nekolik sekund, proto dame vedet.
         if (!book.hasHistory() && !book.atBookStart() && book.percent() > 3)
-          ui.drawBusy("Dopočítávám stránky…");
+          ui.drawBusy("Dopočítávám stránky...");
         if (book.prevPage(u8, RDR_TXT_TOP, RDR_TXT_BOTTOM, RDR_TXT_LEFT, RDR_TXT_RIGHT)) {
           renderReading(false);
           savePosition();
@@ -574,9 +583,11 @@ void loop() {
     // ---- konec knihy ----------------------------------------------------
     case SC_END:
       if (ev.pin == RDR_BTN_UP) {
+        // Pozice se pri neuspesnem nextPage() nezmenila, takze staci znovu
+        // vykreslit posledni stranku. Drive se volalo prevPage() a ctenar
+        // skoncil o stranku driv, nez cetl.
         g_screen = SC_READ;
-        if (book.prevPage(u8, RDR_TXT_TOP, RDR_TXT_BOTTOM, RDR_TXT_LEFT, RDR_TXT_RIGHT))
-          renderReading(true);
+        renderReading(true);
       } else if (ev.pin == RDR_BTN_PUSH) {
         String justRead = (g_bookIdx >= 0) ? lib.at(g_bookIdx).file : String("");
         book.close();
@@ -586,13 +597,17 @@ void loop() {
       break;
 
     // ---- chybova obrazovka ----------------------------------------------
-    case SC_ERROR:
-      if (ev.pin == RDR_BTN_PUSH) {
-        lib.scan();
-        RdrCategory c = lib.firstNonEmpty(RDR_CAT_READING);
-        if (c != RDR_CAT_COUNT) { g_cat = c; showTabs(true); }
+    // Libovolne tlacitko vrati do seznamu. Kdyz je karta porad prazdna,
+    // hlaska zustane na displeji.
+    case SC_ERROR: {
+      lib.scan();
+      RdrCategory c = lib.firstNonEmpty(g_cat);
+      if (c != RDR_CAT_COUNT) {
+        if (c != g_cat) { g_cat = c; g_cursor = 0; g_scroll = 0; }
+        showList(true);
       }
       break;
+    }
   }
 
   // Pockat, az je tlacitko prokazatelne uvolnene a klidne, a teprve pak

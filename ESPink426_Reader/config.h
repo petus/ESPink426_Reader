@@ -7,7 +7,8 @@
 //  CS 46 / MOSI 37 / CLK 14 / MISO 21. To je popis uSup KONEKTORU
 //  (a i tam ma MOSI chybne), NIKOLI microSD karty. Nezamenovat.
 //
-//  Displej: Good Display GDEQ0426T82, NATIVNE 480x800 (na vysku), BW.
+//  Displej: Good Display GDEQ0426T82, 800x480 BW (GxEPD2 ho bere na sirku,
+//  na vysku se otaci pres RDR_ROTATION).
 //  Trida GxEPD2: GxEPD2_426_GDEQ0426T82
 // ============================================================================
 #pragma once
@@ -153,7 +154,7 @@
 // ===========================================================================
 // ---------------------------------------------------------------------------
 //  ZPUSOB CEKANI NA TLACITKO
-//   0 = polling se snizenym taktem CPU (VYCHOZI, spolehlive, ~20-40 mA)
+//   0 = polling se snizenym taktem CPU (zaloha, ~20-40 mA)
 //   1 = light-sleep (VYCHOZI, radove usporne)
 //
 //  Drivejsi restarty rst:0x10 (RTCWDT_RTC_RST) mely pricinu v tom, ze
@@ -258,6 +259,7 @@
 // ===========================================================================
 //  NASTAVENI ARDUINO IDE
 //    Board: ESP32S3 Dev Module, Flash 16MB
-//    PSRAM: neni potreba
-//    USB Mode: "USB-OTG (TinyUSB)"   <- nutne pro rezim USB disku
+//    Partition Scheme: 16M Flash (3MB APP/9.9MB FATFS)
+//    USB CDC On Boot: Disabled   (deska nema nativni USB)
+//    PSRAM: Disabled             (neni potreba; starsi kusy desky ji nemaji)
 // ===========================================================================

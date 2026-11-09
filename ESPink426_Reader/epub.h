@@ -26,6 +26,7 @@
 #pragma once
 #include <Arduino.h>
 #include <SD.h>
+#include <vector>
 #include "config.h"
 #include "zip.h"
 #include "inflate.h"
@@ -53,8 +54,10 @@ public:
 
     String opfDir = dirOf(_zip.entry(opf).name);
     String title, author;
-    static String spine[RDR_ZIP_MAX_ENTRIES];
-    int nSpine = readOpf(opf, opfDir, title, author, spine, RDR_ZIP_MAX_ENTRIES);
+    // Lokalni vektor misto statickeho pole: po konverzi se pamet uvolni
+    // a pocet dokumentu neni omezeny pevnym limitem.
+    std::vector<String> spine;
+    int nSpine = readOpf(opf, opfDir, title, author, spine);
     if (nSpine <= 0) { _zip.close(); return fail("Nepodařilo se přečíst obsah knihy."); }
     RDR_LOG("epub: '%s' / '%s', %d dokumentu", title.c_str(), author.c_str(), nSpine);
 
@@ -64,6 +67,9 @@ public:
     File out = SD.open(tmp.c_str(), FILE_WRITE);
     if (!out) { _zip.close(); return fail("Na kartu nelze zapisovat."); }
 
+    // Hlavicka je po radcich - zalomeni uvnitr nazvu by rozbilo format.
+    title.replace('\n', ' ');  title.replace('\r', ' ');
+    author.replace('\n', ' '); author.replace('\r', ' ');
     if (title.length())  out.println("T:" + title);
     if (author.length()) out.println("A:" + author);
 
@@ -142,6 +148,9 @@ private:
 
     g_text = "";
     g_textLimit = maxLen;
+    // Predem alokovat celou delku. Pri postupnem pridavani po znacich se
+    // retezec opakovane realokuje a u desitek kB fragmentuje haldu.
+    g_text.reserve(_zip.entry(e).uncompSize + 1);
     if (!_inf.begin()) return "";
     int32_t got = _inf.run(_zip.file(), off, _zip.entry(e).compSize,
                            _zip.entry(e).method, sinkToString, nullptr);
@@ -176,20 +185,21 @@ private:
 
   // Z opf vytahne nazev, autora a poradi dokumentu (spine -> manifest href).
   int readOpf(int e, const String &dir, String &title, String &author,
-              String *spine, int maxSpine) {
-    String x = readSmall(e, 32768);
+              std::vector<String> &spine) {
+    // Limit drive 32 kB. OPF ma kolem 150 B na polozku, takze kniha
+    // s vice nez ~200 soubory se vubec neprevedla.
+    String x = readSmall(e, 98304);
     if (x.length() == 0) { RDR_LOG("epub: opf je prazdny nebo prilis velky"); return 0; }
 
-    title  = tagText(x, "dc:title");
-    author = tagText(x, "dc:creator");
-    if (title.length() == 0)  title  = tagText(x, "title");
-    if (author.length() == 0) author = tagText(x, "creator");
+    title  = decodeEntities(tagText(x, "dc:title"));
+    author = decodeEntities(tagText(x, "dc:creator"));
+    if (title.length() == 0)  title  = decodeEntities(tagText(x, "title"));
+    if (author.length() == 0) author = decodeEntities(tagText(x, "creator"));
 
-    // manifest: id -> href
-    static String ids[RDR_ZIP_MAX_ENTRIES], hrefs[RDR_ZIP_MAX_ENTRIES];
-    int nMan = 0;
+    // manifest: id -> href (jen textove dokumenty)
+    std::vector<String> ids, hrefs;
     int p = 0;
-    while (nMan < RDR_ZIP_MAX_ENTRIES) {
+    for (;;) {
       p = x.indexOf("<item ", p);
       if (p < 0) break;
       int end = x.indexOf('>', p);
@@ -197,32 +207,57 @@ private:
       String item = x.substring(p, end);
       String id   = attr(item, "id");
       String href = attr(item, "href");
-      if (id.length() && href.length()) { ids[nMan] = id; hrefs[nMan] = href; nMan++; }
+      String mt   = attr(item, "media-type");
+      // Textovy dokument pozname podle media-type; pripona je jen zaloha.
+      // Nektere EPUBy pouzivaji pro kapitoly priponu .xml nebo zadnou.
+      String hl = href; hl.toLowerCase();
+      bool isText = (mt.indexOf("html") >= 0) ||
+                    hl.endsWith(".xhtml") || hl.endsWith(".html") || hl.endsWith(".htm");
+      if (id.length() && href.length() && isText) { ids.push_back(id); hrefs.push_back(href); }
       p = end + 1;
     }
 
     // spine: poradi idref
-    int n = 0;
     p = x.indexOf("<spine");
     if (p < 0) return 0;
-    while (n < maxSpine) {
+    for (;;) {
       p = x.indexOf("<itemref", p);
       if (p < 0) break;
       int end = x.indexOf('>', p);
       if (end < 0) break;
       String ref = attr(x.substring(p, end), "idref");
-      for (int k = 0; k < nMan; k++) {
-        if (ids[k] == ref) {
-          String h = hrefs[k];
-          // jen textove dokumenty
-          if (h.endsWith(".xhtml") || h.endsWith(".html") || h.endsWith(".htm"))
-            spine[n++] = dir + urlDecode(h);
-          break;
-        }
+      for (size_t k = 0; k < ids.size(); k++) {
+        if (ids[k] == ref) { spine.push_back(normPath(dir + urlDecode(hrefs[k]))); break; }
       }
       p = end + 1;
     }
-    return n;
+    return (int)spine.size();
+  }
+
+  // Slozi cestu "OEBPS/Text/../Text/kap1.xhtml" na "OEBPS/Text/kap1.xhtml".
+  // V archivu jsou jmena vzdy bez "." a "..", takze bez normalizace by se
+  // takovy dokument nenasel.
+  static String normPath(const String &in) {
+    std::vector<String> parts;
+    int a = 0;
+    while (a <= (int)in.length()) {
+      int b = in.indexOf('/', a);
+      if (b < 0) b = in.length();
+      String seg = in.substring(a, b);
+      if (seg == "..") { if (!parts.empty()) parts.pop_back(); }
+      else if (seg.length() && seg != ".") parts.push_back(seg);
+      a = b + 1;
+    }
+    String out;
+    for (size_t i = 0; i < parts.size(); i++) { if (i) out += '/'; out += parts[i]; }
+    return out;
+  }
+
+  // Nazev a autor v OPF mohou obsahovat entity (&amp; apod.)
+  static String decodeEntities(String t) {
+    t.replace("&amp;", "&"); t.replace("&lt;", "<"); t.replace("&gt;", ">");
+    t.replace("&quot;", "\""); t.replace("&apos;", "'"); t.replace("&#39;", "'");
+    return t;
   }
 
   static String tagText(const String &x, const char *tag) {

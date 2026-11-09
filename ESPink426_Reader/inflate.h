@@ -8,8 +8,9 @@
 //   prubezne rozbaluji a rovnou predavaji ke zpracovani.
 //
 //  POZOR NA ZASOBNIK
-//   Slovnik (32 kB) MUSI byt na halde. Hlavni uloha ma jen 4 kB zasobniku
-//   a lokalni pole teto velikosti zpusobi tezko dohledatelne pady.
+//   Slovnik (32 kB) i stav dekompresoru (~11 kB) MUSI byt na halde.
+//   Zasobnik hlavni ulohy ma 16 kB a takove struktury se do nej nevejdou
+//   spolu s hloubkou volani parseru a zapisu na kartu.
 //
 //  RAW DEFLATE
 //   ZIP uklada holy deflate BEZ zlib hlavicky, takze se NESMI pouzit
@@ -34,7 +35,11 @@ public:
     freeBuffers();
     _dict = (uint8_t *)malloc(TINFL_LZ_DICT_SIZE);   // 32 kB, nutne na halde
     _in   = (uint8_t *)malloc(IN_CHUNK);
-    if (!_dict || !_in) {
+    // Stav dekompresoru ma kolem 11 kB (Huffmanovy tabulky). Drive lezel
+    // na zasobniku, ktery ma 16 kB celkem - pad "Stack canary" visel
+    // na vlasku. Patri na haldu stejne jako slovnik.
+    _decomp = (tinfl_decompressor *)malloc(sizeof(tinfl_decompressor));
+    if (!_dict || !_in || !_decomp) {
       RDR_LOG("inflate: nedostatek pameti (volno %u B)", (unsigned)ESP.getFreeHeap());
       freeBuffers();
       return false;
@@ -46,7 +51,7 @@ public:
   // Vraci pocet rozbalenych bajtu, nebo -1 pri chybe.
   int32_t run(File &f, uint32_t dataOffset, uint32_t compSize, uint16_t method,
               RdrInflateSink sink, void *ctx) {
-    if (!_dict || !_in) return -1;
+    if (!_dict || !_in || !_decomp) return -1;
 
     f.seek(dataOffset);
 
@@ -68,7 +73,7 @@ public:
       return -1;
     }
 
-    tinfl_decompressor decomp;
+    tinfl_decompressor &decomp = *_decomp;
     tinfl_init(&decomp);
 
     uint32_t compLeft = compSize;
@@ -120,8 +125,10 @@ private:
   static const size_t IN_CHUNK = 2048;
   uint8_t *_dict = nullptr;
   uint8_t *_in   = nullptr;
+  tinfl_decompressor *_decomp = nullptr;
 
   void freeBuffers() {
+    if (_decomp) { free(_decomp); _decomp = nullptr; }
     if (_dict) { free(_dict); _dict = nullptr; }
     if (_in)   { free(_in);   _in   = nullptr; }
   }

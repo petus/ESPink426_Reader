@@ -27,6 +27,7 @@
 #include <SD.h>
 #include <Preferences.h>
 #include "config.h"
+#include "textmap.h"
 
 enum RdrCategory : uint8_t {
   RDR_CAT_READING = 0,   // Rozecteno
@@ -207,12 +208,17 @@ private:
     String t = f.substring(0, f.length() - 5);   // utnout ".book" / ".epub"
     t.replace('-', ' ');
     t.replace('_', ' ');
-    if (t.length()) t.setCharAt(0, toupper(t[0]));
+    // toupper jen u ASCII - u prvniho bajtu UTF-8 znaku (C s hackem apod.)
+    // by vznikl neplatny znak
+    if (t.length() && (uint8_t)t[0] < 0x80) t.setCharAt(0, toupper(t[0]));
     return t;
   }
 
   void loadPos(RdrBookEntry &b) {
     File f = SD.open(b.posPath(), FILE_READ);
+    // savePos() maze stary .pos a prejmenovava .tmp. Kdyz prisel vypadek
+    // napajeni presne mezi tim, zustal jen .tmp - pouzijeme ho.
+    if (!f) f = SD.open(b.posPath() + ".tmp", FILE_READ);
     if (!f) return;
     b.offset = f.readStringUntil('\n').toInt();
     b.line   = f.readStringUntil('\n').toInt();
@@ -232,7 +238,11 @@ private:
       for (int k = 0; k < 4 && f.available(); k++) {
         String ln = f.readStringUntil('\n');
         if (ln.endsWith("\r")) ln.remove(ln.length() - 1);
-        if (ln.startsWith("T:")) { _books[i].title = ln.substring(2); break; }
+        if (ln.startsWith("T:")) {
+          _books[i].title = ln.substring(2);
+          rdrSanitizeForDisplay(_books[i].title);
+          break;
+        }
         if (!ln.startsWith("A:")) break;    // hlavicka skoncila
       }
       f.close();
@@ -253,10 +263,14 @@ private:
     }
   }
 
+  // Porovnani MUSI byt nejdriv podle kategorie. Drive se knihy ruznych
+  // kategorii porovnavaly podle nazvu a rozectene jen mezi sebou podle seq;
+  // takove razeni neni tranzitivni a rozectene knihy prolozene ostatnimi
+  // pak nebyly serazene od naposledy ctene.
   static bool isAfter(const RdrBookEntry &a, const RdrBookEntry &b) {
-    bool ar = (a.category() == RDR_CAT_READING);
-    bool br = (b.category() == RDR_CAT_READING);
-    if (ar && br) return a.seq < b.seq;          // vetsi seq driv
+    RdrCategory ca = a.category(), cb = b.category();
+    if (ca != cb) return ca > cb;
+    if (ca == RDR_CAT_READING) return a.seq < b.seq;   // vetsi seq driv
     String x = a.title; x.toLowerCase();
     String y = b.title; y.toLowerCase();
     return x > y;
