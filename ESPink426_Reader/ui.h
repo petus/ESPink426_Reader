@@ -297,7 +297,9 @@ public:
 
   // Prubehova obrazovka (napr. dopocitavani stranek pri kroku zpet)
   void drawBusy(const String &what) {
-    _d.setPartialWindow(0, RDR_SCREEN_H / 2 - 40, RDR_SCREEN_W, 80);
+    // Jen uzky pruh kolem textu (y H/2-16 .. H/2+16, nasobky 8). Sirsi okno
+    // mazalo spodek nadpisu i radek pod nim v drawMessage.
+    _d.setPartialWindow(0, RDR_SCREEN_H / 2 - 16, RDR_SCREEN_W, 32);
     _d.firstPage();
     do {
       _d.fillScreen(GxEPD_WHITE);
